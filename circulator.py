@@ -111,11 +111,12 @@ def setupArgs(logger):
 
     if args.out != "":
         logger.info(rf"output file: {args.out}")
+        global output_file
+        output_file = os.path.abspath(args.out)
 
     global input_file
     input_file = os.path.abspath(args.fasta_file)
-    global output_file
-    output_file = os.path.abspath(args.out)
+
 
     logger.info(
         os.path.abspath(input_file))
