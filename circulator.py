@@ -23,10 +23,10 @@ _/ ___\|  \_  __ \_/ ___\|  |  \  | \__  \\_  __ \/  _ \   __\\
 Translate potential CDSs in circRNAs.\nBy Amin Mahpour.\n"""
 examples = """
 Examples:
-Circulator.py input.fa output.fa #Simple usage
-Circulator.py -t 4 input.fa output.fa #Add 4 threads
-Circulator.py -t 4 -l input.fa output.fa #Add 4 threads and keep the longest CDS.
-Circulator.py -t 4 -l -m 25 input.fa output.fa #Add 4 threads and keep the longest CDS and set a cutoff of 25 amino acids.
+Circulator.py input.fa > output.fa #Simple usage
+Circulator.py -t 4 input.fa -o output.fa #Add 4 threads
+Circulator.py -t 4 -l input.fa -o output.fa #Add 4 threads and keep the longest CDS.
+Circulator.py -t 4 -l -m 25 input.fa > output.fa #Add 4 threads and keep the longest CDS and set a cutoff of 25 amino acids.
 if you used this application in your project please cite:
 XXX.XXXX 
 \n
@@ -109,13 +109,13 @@ def setupArgs(logger):
     # print(args.accumulate(args.integers))
     logger.info(rf"input file: {args.fasta_file}")
 
-    if args.out != None:
+    if args.out != "":
         logger.info(rf"output file: {args.out}")
 
     global input_file
     input_file = os.path.abspath(args.fasta_file)
     global output_file
-    output_file = args.out
+    output_file = os.path.abspath(args.out)
 
     logger.info(
         os.path.abspath(input_file))
@@ -257,9 +257,9 @@ if __name__ == '__main__':
     logger.info(rf"Running with {NUM_PROCS} CPUs...")
     fastaIterator = fasta_iter()
     with Pool(processes=NUM_PROCS) as pool:
-        x = pool.map(findCircleCDS, fastaIterator)
+        results = pool.map(findCircleCDS, fastaIterator)
 
-    cleaned = [i for i in x if i != []]
+    cleaned = [i for i in results if i != []]
 
     if output_file == "":
 
