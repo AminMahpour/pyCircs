@@ -86,7 +86,7 @@ def fasta_iter():
 
         yield headerStr, seq.upper().replace("U", "T")
 
-def setupArgs():
+def setupArgs(logger):
     parser = argparse.ArgumentParser(prog="Circulator.py", formatter_class=argparse.RawDescriptionHelpFormatter,
                                      description=logo, epilog=examples)
     parser.add_argument("fasta_file", metavar="Input", help="Input FASTA file.")
@@ -135,7 +135,7 @@ def setupArgs():
         NUM_PROCS = args.threads
     global len_limit
     len_limit = 0
-
+    logger = logging.getLogger("Circulator")
 # NUM_PROCS = multiprocessing.cpu_count()
 
 
@@ -252,7 +252,7 @@ if __name__ == '__main__':
     ch.setFormatter(CustomFormatter())
     logger.addHandler(ch)
 
-    setupArgs()
+    setupArgs(logger)
 
     logger.info(rf"Running with {NUM_PROCS} CPUs...")
     fastaIterator = fasta_iter()
