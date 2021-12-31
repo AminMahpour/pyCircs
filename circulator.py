@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 import re
+import os
+import sys
 from os.path import exists
 import logging
 import multiprocessing
 from multiprocessing import Pool
 from itertools import groupby
 import argparse
+
+# App info
 version = "0.1a"
 logo = """
 
@@ -28,14 +32,46 @@ XXX.XXXX
 \n
 """
 
-def fasta_iter(fasta_name):
+# Default parameter values
+keep_longest = True
+min_aa = 20
+fastaRNA = False
+NUM_PROCS = 1
+input_file = ""
+output_file = ""
+len_limit = 20
+
+class CustomFormatter(logging.Formatter):
+
+    grey = "\x1b[38;20m"
+    yellow = "\x1b[33;20m"
+    red = "\x1b[31;20m"
+    bold_red = "\x1b[31;1m"
+    reset = "\x1b[0m"
+    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: grey + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+def fasta_iter():
     """
     modified from Brent Pedersen
     Correct Way To Parse A Fasta File In Python
     given a fasta file. yield tuples of header, sequence
     """
     "first open the file outside "
-    fh = open(fasta_name)
+    print(os.path.abspath(input_file))
+    fh = open(file= os.path.abspath(input_file), mode="r")
 
     # ditch the boolean (x[0]) and just keep the header or sequence since
     # we know they alternate.
@@ -50,52 +86,65 @@ def fasta_iter(fasta_name):
 
         yield headerStr, seq.upper().replace("U", "T")
 
+def setupArgs():
+    parser = argparse.ArgumentParser(prog="Circulator.py", formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     description=logo, epilog=examples)
+    parser.add_argument("fasta_file", metavar="Input", help="Input FASTA file.")
+    #parser.add_argument("output_file", metavar="Output", help="Output protein FASTA file.")
+    parser.add_argument("-o","--out", metavar="Output", default="", help="Output protein FASTA file.")
+    parser.add_argument("-m", "--min", type=int, default=20,
+                        help='Cutoff CDS size. default: 20.')
 
-parser = argparse.ArgumentParser(prog="Circulator.py", formatter_class=argparse.RawDescriptionHelpFormatter,
-                                 description=logo, epilog=examples)
-parser.add_argument("fasta_file", metavar="Input", help="Input FASTA file.")
-parser.add_argument("output_file", metavar="Output", help="Output protein FASTA file.")
-parser.add_argument("-m", "--min", type=int, default=20,
-                    help='Cutoff CDS size. default: 20.')
+    parser.add_argument("-t", "--threads", type=int, default=0,
+                        help='Requested processor numbers. Default(0) uses all available cores. example: -t 4')
 
-parser.add_argument("-t", "--threads", type=int, default=0,
-                    help='Requested processor numbers. Default(0) uses all available cores. example: -t 4')
+    parser.add_argument("-l", "--longest", action="store_true", default=False, help="Only keep longest ORFs.")
+    parser.add_argument("-r", "--rna", action="store_true", default=False, help="Input fasta file is RNA sequence.")
 
-parser.add_argument("-l", "--longest", action="store_true", default=False, help="Only keep longest ORFs.")
-parser.add_argument("-r", "--rna", action="store_true", default=False, help="Input fasta file is RNA sequence.")
+    parser.add_argument("-v", "--version", action="version", version=version)
 
-parser.add_argument("-v", "--version", action="version", version=version)
+    args = parser.parse_args()
 
-args = parser.parse_args()
-logging.basicConfig(level=logging.INFO)
-# print(args.accumulate(args.integers))
-logging.info(rf"input file: {args.fasta_file}")
-logging.info(rf"output file: {args.output_file}")
+    # print(args.accumulate(args.integers))
+    logger.info(rf"input file: {args.fasta_file}")
 
+    if args.out != None:
+        logger.info(rf"output file: {args.out}")
 
+    global input_file
+    input_file = os.path.abspath(args.fasta_file)
+    global output_file
+    output_file = args.out
 
-input_file = args.fasta_file
-output_file = args.output_file
+    logger.info(
+        os.path.abspath(input_file))
+    if not (exists(input_file)):
+        logger.critical("Input file not found.")
+        exit(1)
+    global keep_longest
+    keep_longest = args.longest
+    global min_aa
+    min_aa = args.min
+    global  fastaRNA
+    fastaRNA = args.rna
 
-if not (exists(input_file)):
-    logging.critical("Input file not found.")
-    exit(1)
-keep_longest = args.longest
-min_aa = args.min
-fastaRNA = args.rna
-
-
-if args.threads == 0:
-    NUM_PROCS = multiprocessing.cpu_count()
-else:
-    NUM_PROCS = args.threads
-
-len_limit = 0
+    global NUM_PROCS
+    if args.threads == 0:
+        NUM_PROCS = multiprocessing.cpu_count()
+    else:
+        NUM_PROCS = args.threads
+    global len_limit
+    len_limit = 0
 
 # NUM_PROCS = multiprocessing.cpu_count()
 
 
 def translate(seq):
+    """
+    Translates a sequence if the sequence is dividable by 3.
+    :param seq: Sequence string
+    :return: Protein sequence.
+    """
     table = {
         'ATA': 'I', 'ATC': 'I', 'ATT': 'I', 'ATG': 'M',
         'ACA': 'T', 'ACC': 'T', 'ACG': 'T', 'ACT': 'T',
@@ -123,6 +172,12 @@ def translate(seq):
 
 
 def cdsSeeker(seq: str) -> [int, int]:
+    """
+    Finds CDSs.
+
+    :param seq: Sequence String
+    :return: A list of Int denoting begining and end of CDSs.
+    """
     # print("Starting...")
     startList: [re.Match] = []
     endList: [re.Match] = []
@@ -151,6 +206,11 @@ def cdsSeeker(seq: str) -> [int, int]:
 
 
 def findCircleCDS(seq: [str]) -> [str]:
+    """
+    Find CDSs withing a DNA/RNA with circular topology
+    :param seq: Sequence string
+    :return: A list of CDSs
+    """
     name: str = seq[0]
     duplicateSequence: str = seq[1] * 2
     CDSsequence = set()
@@ -184,22 +244,45 @@ if __name__ == '__main__':
     # example = "TAGTTTTTTTTTTATGGGAGGA"
     # cdses = findCircleCDS(example)
     # print(cdses)
-    print(rf"Running with {NUM_PROCS} CPUs...")
-    fastaIterator = fasta_iter(input_file)
+
+    logger = logging.getLogger("Circulator")
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(CustomFormatter())
+    logger.addHandler(ch)
+
+    setupArgs()
+
+    logger.info(rf"Running with {NUM_PROCS} CPUs...")
+    fastaIterator = fasta_iter()
     with Pool(processes=NUM_PROCS) as pool:
         x = pool.map(findCircleCDS, fastaIterator)
 
     cleaned = [i for i in x if i != []]
 
-    f = open(file=output_file, mode="w")
+    if output_file == "":
 
-    for i in cleaned:
-        for j in i:
-            f.write(rf">{j[0]}")
-            f.write("\n")
-            f.write(j[2])
-            f.write("\n")
+        with sys.stdout as stdout:
+            for i in cleaned:
+                for j in i:
+                    stdout.write(rf">{j[0]}")
+                    stdout.write("\n")
+                    stdout.write(j[2])
+                    stdout.write("\n")
+            stdout.close()
 
-    f.close()
+    else:
+
+        f = open(file=output_file, mode="w")
+
+        for i in cleaned:
+            for j in i:
+                f.write(rf">{j[0]}")
+                f.write("\n")
+                f.write(j[2])
+                f.write("\n")
+
+        f.close()
 #   for x in fasta_iter(input_file):
 #   print(x[0])
