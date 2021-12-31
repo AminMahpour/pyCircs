@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import re
+from os.path import exists
+import logging
 import multiprocessing
 from multiprocessing import Pool
 from itertools import groupby
@@ -65,12 +67,19 @@ parser.add_argument("-r", "--rna", action="store_true", default=False, help="Inp
 parser.add_argument("-v", "--version", action="version", version=version)
 
 args = parser.parse_args()
+logging.basicConfig(level=logging.INFO)
 # print(args.accumulate(args.integers))
-print(rf"input file: {args.fasta_file}")
-print(rf"output file: {args.output_file}")
+logging.info(rf"input file: {args.fasta_file}")
+logging.info(rf"output file: {args.output_file}")
+
+
 
 input_file = args.fasta_file
 output_file = args.output_file
+
+if not (exists(input_file)):
+    logging.critical("Input file not found.")
+    exit(1)
 keep_longest = args.longest
 min_aa = args.min
 fastaRNA = args.rna
