@@ -44,6 +44,7 @@ len_limit = 20
 class CustomFormatter(logging.Formatter):
 
     grey = "\x1b[38;20m"
+    green = "\x1B[32m"
     yellow = "\x1b[33;20m"
     red = "\x1b[31;20m"
     bold_red = "\x1b[31;1m"
@@ -52,7 +53,7 @@ class CustomFormatter(logging.Formatter):
 
     FORMATS = {
         logging.DEBUG: grey + format + reset,
-        logging.INFO: grey + format + reset,
+        logging.INFO: green + format + reset,
         logging.WARNING: yellow + format + reset,
         logging.ERROR: red + format + reset,
         logging.CRITICAL: bold_red + format + reset
@@ -253,7 +254,6 @@ if __name__ == '__main__':
     logger.addHandler(ch)
 
     setupArgs(logger)
-
     logger.info(rf"Running with {NUM_PROCS} CPUs...")
     fastaIterator = fasta_iter()
     with Pool(processes=NUM_PROCS) as pool:
