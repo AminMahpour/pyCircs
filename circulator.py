@@ -49,7 +49,8 @@ class CustomFormatter(logging.Formatter):
     red = "\x1b[31;20m"
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
-    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+    #format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+    format = "%(levelname)s: %(message)s"
 
     FORMATS = {
         logging.DEBUG: grey + format + reset,
@@ -71,7 +72,7 @@ def fasta_iter():
     given a fasta file. yield tuples of header, sequence
     """
     "first open the file outside "
-    print(os.path.abspath(input_file))
+
     fh = open(file= os.path.abspath(input_file), mode="r")
 
     # ditch the boolean (x[0]) and just keep the header or sequence since
@@ -107,22 +108,28 @@ def setupArgs(logger):
     args = parser.parse_args()
 
     # print(args.accumulate(args.integers))
-    logger.info(rf"input file: {args.fasta_file}")
-
-    if args.out != "":
-        logger.info(rf"output file: {args.out}")
-        global output_file
-        output_file = os.path.abspath(args.out)
+    #logger.info(rf"Input file: {args.fasta_file}")
 
     global input_file
     input_file = os.path.abspath(args.fasta_file)
 
-
-    logger.info(
-        os.path.abspath(input_file))
     if not (exists(input_file)):
-        logger.critical("Input file not found.")
+        logger.critical(rf"Input file {input_file} not found.")
+        logger.critical("Program exiting...")
+
         exit(1)
+    else:
+        logger.info(rf"Input file: {input_file}")
+
+    if args.out != "":
+        global output_file
+        output_file = os.path.abspath(args.out)
+        logger.info(rf"Output file: {output_file}")
+
+
+
+
+
     global keep_longest
     keep_longest = args.longest
     global min_aa
